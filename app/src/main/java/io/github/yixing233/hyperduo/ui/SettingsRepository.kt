@@ -75,6 +75,16 @@ class SettingsRepository(context: Context) {
     /** Weight of the two readouts - see [Prefs.KEY_PERF_WEIGHT]. */
     fun setPerfWeight(value: Int) = writeInt(Prefs.KEY_PERF_WEIGHT, value)
 
+    // ------------------------------------------------------------------- font
+
+    /**
+     * Path of the installed font, or the empty string for the system face.
+     *
+     * See [Prefs.KEY_FONT_PATH]. The caller has already copied the file to a
+     * location the hooked process can read; this only records where.
+     */
+    fun setFontPath(value: String) = writeString(Prefs.KEY_FONT_PATH, value)
+
     // ----------------------------------------------------------------- colours
 
     fun setRoleColors(value: Boolean) = writeBoolean(Prefs.KEY_ROLE_COLORS, value)
@@ -161,6 +171,11 @@ class SettingsRepository(context: Context) {
             prefs.putInt(Prefs.KEY_PERF_SCALE, snapshot.perfScale)
             prefs.putInt(Prefs.KEY_PERF_WEIGHT, snapshot.perfWeight)
             prefs.putInt(Prefs.KEY_GLYPH_SCALE, snapshot.glyphScale)
+            // A key missing from this list is re-pushed as its default after every
+            // framework reconnect, so a chosen font would silently revert on the
+            // next bind. This is the list DEVELOPMENT.md calls out for exactly that
+            // reason.
+            prefs.putString(Prefs.KEY_FONT_PATH, snapshot.fontPath)
 
             prefs.putBoolean(Prefs.KEY_ROLE_COLORS, snapshot.roleColors)
             prefs.putInt(Prefs.KEY_COLOR_CRITICAL_ON_DARK, snapshot.criticalOnDark)
@@ -199,6 +214,21 @@ class SettingsRepository(context: Context) {
     private fun writeInt(key: String, value: Int) {
         preferences().edit(commit = true) { putInt(key, value) }
         push { it.putInt(key, value) }
+        notifyModule()
+    }
+
+    /**
+     * The String counterpart of the two writers above.
+     *
+     * <p>Only [Prefs.KEY_FONT_PATH] uses it today, and the whole point of keeping
+     * it here rather than writing the key inline at the call site is that the
+     * three-step dance - own file, framework mirror, broadcast - stays in one
+     * place. Writing only the first step leaves a value that looks saved in the
+     * settings app and never reaches the status bar.
+     */
+    private fun writeString(key: String, value: String) {
+        preferences().edit(commit = true) { putString(key, value) }
+        push { it.putString(key, value) }
         notifyModule()
     }
 

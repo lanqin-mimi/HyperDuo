@@ -150,6 +150,16 @@ public final class TrioAppearance {
     public final int typeSuffixScale;
     public final int typeWeight;
 
+    /**
+     * Absolute path of the user's font file, or "" for the system face.
+     *
+     * <p>Resolved to non-null in the constructor, like every other field here, so
+     * no consumer has to test for null. The renderer compares it against the face
+     * it currently has loaded, which is what makes a font change take effect on
+     * the next frame without any invalidation call.
+     */
+    public final String fontPath;
+
     private TrioAppearance(TrioSettings c) {
         style = c.trioStyle;
         rect = c.trioStyle == Prefs.STYLE_RECT;
@@ -196,6 +206,8 @@ public final class TrioAppearance {
         outSignalMargin = c.outSignalMargin;
         typeSuffixScale = c.typeSuffixScale;
         typeWeight = c.typeWeight;
+
+        fontPath = c.fontPath == null ? "" : c.fontPath;
     }
 
     /** The appearance of {@code cfg}, or of the shipped defaults when it is null. */

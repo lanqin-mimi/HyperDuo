@@ -201,6 +201,15 @@ public final class TrioSettings {
     /** Only used by the settings app: the hooked side reads this via {@code TrioConfig}. */
     public boolean debugLog;
 
+    /**
+     * Absolute path of the user's font file, or "" for the system face.
+     *
+     * <p>Never null: the renderer treats null and "" the same, but a null here
+     * would also have to be defended in the equals/bundle paths, and emptiness
+     * already means "no custom font" without any of that.
+     */
+    public String fontPath;
+
     public static TrioSettings defaults() {
         TrioSettings s = new TrioSettings();
         s.enabled = Prefs.DEF_ENABLED;
@@ -221,6 +230,7 @@ public final class TrioSettings {
         s.perfScale = Prefs.DEF_PERF_SCALE;
         s.perfWeight = Prefs.DEF_PERF_WEIGHT;
         s.glyphScale = Prefs.DEF_GLYPH_SCALE;
+        s.fontPath = Prefs.DEF_FONT_PATH;
 
         s.roleColors = Prefs.DEF_ROLE_COLORS;
         s.criticalOnDark = Prefs.DEF_COLOR_CRITICAL_ON_DARK;
@@ -300,6 +310,7 @@ public final class TrioSettings {
         s.glyphScale = Prefs.clamp(
                 p.getInt(Prefs.KEY_GLYPH_SCALE, Prefs.DEF_GLYPH_SCALE),
                 Prefs.MIN_GLYPH_SCALE, Prefs.MAX_GLYPH_SCALE);
+        s.fontPath = readFontPath(p.getString(Prefs.KEY_FONT_PATH, Prefs.DEF_FONT_PATH));
 
         s.roleColors = p.getBoolean(Prefs.KEY_ROLE_COLORS, Prefs.DEF_ROLE_COLORS);
         s.criticalOnDark = p.getInt(Prefs.KEY_COLOR_CRITICAL_ON_DARK, Prefs.DEF_COLOR_CRITICAL_ON_DARK);
@@ -429,6 +440,18 @@ public final class TrioSettings {
     }
 
     /**
+     * Normalises a stored font path to a non-null string.
+     *
+     * <p>Null is folded to the empty string here rather than at every reader,
+     * because the value crosses a process boundary: the hooked side can be handed
+     * a null from a bundle built by an older app, and a null path reaching the
+     * renderer would mean a null check in the draw path.
+     */
+    private static String readFontPath(String stored) {
+        return stored == null ? Prefs.DEF_FONT_PATH : stored;
+    }
+
+    /**
      * An independent copy. A snapshot is published as a whole and never mutated
      * afterwards, so updating a single field means copying and republishing.
      */
@@ -452,6 +475,7 @@ public final class TrioSettings {
         s.perfScale = perfScale;
         s.perfWeight = perfWeight;
         s.glyphScale = glyphScale;
+        s.fontPath = fontPath;
 
         s.roleColors = roleColors;
         s.criticalOnDark = criticalOnDark;
@@ -537,6 +561,7 @@ public final class TrioSettings {
             case Prefs.KEY_TYPE_SUFFIX_SCALE: typeSuffixScale = src.typeSuffixScale; return true;
             case Prefs.KEY_TYPE_WEIGHT: typeWeight = src.typeWeight; return true;
             case Prefs.KEY_TRACK_ALPHA: trackAlpha = src.trackAlpha; return true;
+            case Prefs.KEY_FONT_PATH: fontPath = src.fontPath; return true;
             case Prefs.KEY_DEBUG_LOG: debugLog = src.debugLog; return true;
             default: return false;
         }
@@ -583,6 +608,7 @@ public final class TrioSettings {
         s.glyphScale = Prefs.clamp(
                 bundle.getInt(Prefs.KEY_GLYPH_SCALE, Prefs.DEF_GLYPH_SCALE),
                 Prefs.MIN_GLYPH_SCALE, Prefs.MAX_GLYPH_SCALE);
+        s.fontPath = readFontPath(bundle.getString(Prefs.KEY_FONT_PATH, Prefs.DEF_FONT_PATH));
 
         s.roleColors = bundle.getBoolean(Prefs.KEY_ROLE_COLORS, Prefs.DEF_ROLE_COLORS);
         s.criticalOnDark = bundle.getInt(Prefs.KEY_COLOR_CRITICAL_ON_DARK, Prefs.DEF_COLOR_CRITICAL_ON_DARK);
@@ -684,6 +710,7 @@ public final class TrioSettings {
         b.putInt(Prefs.KEY_PERF_SCALE, perfScale);
         b.putInt(Prefs.KEY_PERF_WEIGHT, perfWeight);
         b.putInt(Prefs.KEY_GLYPH_SCALE, glyphScale);
+        b.putString(Prefs.KEY_FONT_PATH, fontPath);
 
         b.putBoolean(Prefs.KEY_ROLE_COLORS, roleColors);
         b.putInt(Prefs.KEY_COLOR_CRITICAL_ON_DARK, criticalOnDark);
@@ -769,6 +796,12 @@ public final class TrioSettings {
                 // the old number on the next recomposition.
                 && perfWeight == s.perfWeight
                 && glyphScale == s.glyphScale
+                // Objects.equals, not ==: the font path is the one reference-typed
+                // field here, and == would compare identities. Two snapshots built
+                // from the same stored path hold different String instances, so a
+                // reference compare would report "changed" on every read and make
+                // the settings row rebuild endlessly.
+                && java.util.Objects.equals(fontPath, s.fontPath)
                 && roleColors == s.roleColors
                 && criticalOnDark == s.criticalOnDark
                 && criticalOnLight == s.criticalOnLight

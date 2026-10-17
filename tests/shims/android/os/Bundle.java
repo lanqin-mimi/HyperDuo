@@ -24,6 +24,11 @@ public class Bundle {
         values.put(key, value);
     }
 
+    /** Needed by the font path, the module's one String-valued key. */
+    public void putString(String key, String value) {
+        values.put(key, value);
+    }
+
     public boolean getBoolean(String key, boolean defValue) {
         Object v = values.get(key);
         return v instanceof Boolean ? (Boolean) v : defValue;
@@ -32,6 +37,11 @@ public class Bundle {
     public int getInt(String key, int defValue) {
         Object v = values.get(key);
         return v instanceof Integer ? (Integer) v : defValue;
+    }
+
+    public String getString(String key, String defValue) {
+        Object v = values.get(key);
+        return v instanceof String ? (String) v : defValue;
     }
 
     public boolean containsKey(String key) {

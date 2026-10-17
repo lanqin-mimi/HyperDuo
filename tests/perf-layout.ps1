@@ -74,7 +74,12 @@ if(!$minPerfWeight -or !$maxPerfWeight -or !$defPerfWeight){throw 'could not rea
 # before the slider existed. These patterns are the lock instead.
 foreach($needle in @(
     'perfLineHeight\(base, a\.perfTypeWeight\(\)\)',
-    'perf\.setTypeface\(TrioRenderer\.typefaceFor\(weight\)\)',
+    # The readout is dressed through the shared styling helper rather than a bare
+    # setTypeface: the helper also applies the synthetic embolden a custom
+    # single-weight font needs, and keeping that pairing in one place is what
+    # stops the two halves drifting apart. The weight still has to be the
+    # readout's own, which is what the last two patterns pin.
+    'TrioRenderer\.styleTextView\(perf, weight\)',
     'perf\.weight != weight',
     'perf\.weight = weight'
 )){
@@ -89,7 +94,11 @@ if([regex]::IsMatch($hooks, 'perfLineHeight\([^)]*a\.typeWeight\)')){throw 'the 
 # size identical there, so no other term can see it.
 $resync=[regex]::Match($hooks,'(?s)if \(perf\.getVisibility\(\) != View\.VISIBLE.*?requestPerfSync\(container\);').Value
 if(-not $resync){throw 'could not read the re-sync test out of TrioHooks'}
-foreach($term in @('perf\.getVisibility\(\)','contentEquals','getTextSize','getLineSpacingMultiplier','perf\.weight != weight')){
+foreach($term in @('perf\.getVisibility\(\)','contentEquals','getTextSize','getLineSpacingMultiplier','perf\.weight != weight',
+        # A font swap moves the face without touching any of the terms above, so
+        # the gate has to ask about it too or picking a new font would not reach
+        # the row until something unrelated happened to change.
+        'perf\.fontGeneration != TrioRenderer\.fontGeneration\(\)')){
     if(-not [regex]::IsMatch($resync, $term)){throw "the re-sync test does not ask about: $term"}
 }
 
@@ -229,6 +238,7 @@ public class Paint {
     private float textSize = 12f;
     private String family = "SansSerif";
     private int typefaceStyle = Font.PLAIN;
+    private boolean fakeBold = false;
 
     public void setTextSize(float s) { textSize = s; }
 
@@ -240,6 +250,17 @@ public class Paint {
             typefaceStyle = t.style();
         }
     }
+
+    /**
+     * Synthetic emboldening. The stub keeps the flag so a caller that sets it can
+     * be seen to have done so, but leaves the metrics alone: every case in this
+     * harness runs without a custom font loaded, where the real renderer never
+     * emboldens anything. Making AWT retype the font here would perturb the line
+     * heights the cases below measure, and none of them is about the font feature.
+     */
+    public void setFakeBoldText(boolean bold) { fakeBold = bold; }
+
+    public boolean isFakeBoldText() { return fakeBold; }
 
     public Font font() {
         return new Font(family, typefaceStyle, (int) REFERENCE);
@@ -459,6 +480,24 @@ import android.graphics.Typeface;
 final class TrioRenderer {
 
     private static final Typeface TEXT_BASE = Typeface.create("sans-serif", Typeface.NORMAL);
+
+    /**
+     * No custom font is loaded here: this harness checks the readout's arithmetic,
+     * not the font feature. The field exists because the spliced {@code
+     * typefaceFor} and {@code fakeBoldFor} read it, and null is the "system face"
+     * branch - the one every case below asserts against.
+     *
+     * <p>The production styling helper for a real label is deliberately absent:
+     * nothing spliced here calls it, and it names a platform class this stripped
+     * stub does not carry.
+     */
+    private static final Typeface sFontFace = null;
+
+    private static final int FAKE_BOLD_FROM = 600;
+
+    static boolean fakeBoldFor(int weight) {
+        return sFontFace != null && weight >= FAKE_BOLD_FROM;
+    }
 
     $inkScale1
 
